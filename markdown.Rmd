@@ -1,0 +1,295 @@
+---
+title: "maleque"
+output: html_document
+date: "2024-02-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pacman)
+pacman::p_load("tidyverse", 'readxl', 'corrplot')
+
+dados = read_excel("base_de_dados_31.xlsx")
+
+dados = dados %>% 
+  rename(
+    'R_D' = "R&D"
+  )
+```
+
+
+
+# Introdução
+
+• Objetivo: Investigar a relação entre a eficiência operacional das empresas e a gestão de seus ativos e dívidas. Este tema focará em entender como a gestão de custos, ativos e dívidas influencia a lucratividade e a saúde financeira da empresa. Identificar padrões ou tendências entre diferentes segmentos de mercado e localizações geográficas.
+
+
+# Análise Estatística Descritiva
+
+## Colunas Quantitativas
+
+```{r, echo=FALSE}
+# Obter os tipos de dados inferidos pelo readr
+tipos_de_dados <- sapply(dados, class)
+
+# Separar as variáveis quantitativas e qualitativas
+variaveis_quantitativas <- names(dados)[tipos_de_dados %in% c("numeric", "integer")]
+variaveis_qualitativas <- names(dados)[tipos_de_dados %in% "character"]
+
+# Criar tabela para variáveis quantitativas
+tabela_quantitativas <- data.frame(Variável = variaveis_quantitativas,
+                                   Tipo_de_Dados = "Numérico")
+
+# Criar tabela para variáveis qualitativas
+tabela_qualitativas <- data.frame(Variável = variaveis_qualitativas,
+                                  Tipo_de_Dados = "Texto")
+
+# Imprimir as tabelas
+knitr::kable(tabela_quantitativas)
+```
+
+## Colunas Qualitativas
+
+```{r, echo=FALSE}
+knitr::kable(tabela_qualitativas)
+```
+
+
+
+## Histograma Quantitativas
+```{r}
+
+# Histogramas para variáveis quantitativas
+histogramas <- lapply(variaveis_quantitativas, function(variavel) {
+  ggplot(dados, aes_string(x = variavel)) +
+    geom_histogram(fill = "purple", color = "black", bins = 50) +
+    labs(title = paste("Histograma de", variavel),
+         x = variavel,
+         y = "Frequência") +
+    theme_minimal()
+})
+
+# Gráficos de frequência para variáveis qualitativas
+graficos_qualitativos <- lapply(variaveis_qualitativas, function(variavel) {
+  ggplot(dados, aes_string(x = `variavel`)) +
+    geom_bar(fill = "purple", color = "black") +
+    labs(title = paste("Gráfico de Frequência de", variavel),
+         x = variavel,
+         y = "Frequência") +
+    theme_minimal()
+})
+
+# Imprimir os histogramas
+print("Histogramas para Variáveis Quantitativas:")
+print(histogramas)
+# 
+# # Imprimir os gráficos de frequência
+# print("Gráficos de Frequência para Variáveis Qualitativas:")
+print(graficos_qualitativos)
+
+```
+
+
+
+
+## Outliers com Box-Plots
+
+```{r}
+
+plot_box = function(variavel){
+ggplot(dados, aes_string(y= variavel))+
+  geom_boxplot()+
+    labs(
+      title=paste("Boxplot de ", variavel),
+      y = variavel
+    )
+}
+
+lapply(variaveis_quantitativas[variaveis_quantitativas != "Id"] , plot_box)
+```
+
+# Análise das relações
+
+Etatísticas básicas
+
+
+## Correlação entre variáveis-chave
+```{r}
+
+correlation_matrix <- cor(dados[c("Revenue", "Cost", "Profit", "Debt", "Assets")])
+corrplot(correlation_matrix, method = "circle")
+```
+
+Custo tem correlação positiva com Receita, ou seja, quanto mais investe mais receita obtém.
+
+E Ativos tem correlação positiva com Dívida, ou seja, quanto mais caro o ativo, mais dívida o investidor terá.
+
+
+## Investigando Lucro
+
+
+
+```{r pressure, echo=FALSE}
+dados %>% ggplot(aes(Cost, Revenue, color = Profit))+
+  geom_point()
+```
+
+Pode se ver pelo grafico abaixo, que quanto maior o custo, maior sera a receita, mas isso não necessariamente significa que haverá Lucro.
+
+## Relação entre Ativos e Dívidas e sua Influência na Lucratividade:
+```{r}
+ggplot(dados, aes(x = Assets, y = Profit, color = Debt)) +
+  geom_point() +
+  scale_x_continuous(labels = scales::dollar_format(suffix = "K")) +
+  scale_y_continuous(labels = scales::dollar_format(suffix = "K")) +
+  labs(title = "Relação entre Ativos, Lucro e Dívida")
+```
+
+Ativos de alto custo trazem divida maior para o investidor
+
+## Melhores segmentos de mercado
+
+```{r}
+segment_analysis = dados %>% 
+  group_by(Market) %>% 
+  summarise(
+    mean_profit = mean(Profit)
+  )
+ggplot(segment_analysis, aes(x = Market, y = mean_profit, fill = mean_profit > 0)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Média de Lucro por Segmento de Mercado",
+       x = 'Segmento', y = 'Média de lucro')
+```
+
+Tecnologia é um ótimo segmento para investir
+
+
+## Melhor região para investir
+```{r}
+location_analysis = dados %>% 
+  group_by(Location) %>% 
+  summarise(
+    mean_profit = mean(Profit)
+  )
+
+ggplot(location_analysis, aes(x = Location, y = mean_profit, fill = mean_profit > 0)) +
+  geom_bar(stat = "identity", show.legend=F) +
+  labs(title = "Média de Lucro por Localização Geográfica", x = 'Localização', 
+       y = 'Média de lucro')
+```
+
+Oceania é um ótimo lugar para investir, seguido por America do Norte
+
+
+
+### Localização nao é um indicativo de lucro, não há um padrão evidente para localização.
+```{r}
+
+dados  %>% ggplot(aes(Cost, Profit, color=Location))+
+  geom_point()
+```
+
+### Mercado nao é um indicativo de lucro, não há um padrão evidente para segmento de mercado
+```{r}
+
+dados %>% ggplot(aes(Cost, Profit, color = Market))+
+  geom_point()
+```
+
+```{r}
+
+library(knitr)
+
+kable(
+dados %>% 
+  group_by(Market) %>% 
+  summarise(
+    Lucro_Mediano = median(Profit)
+  )
+, 'simple'
+)
+```
+
+Tecnologia tem uma mediana de 15mil, é o melhor mercado para investir?
+
+O custo é bem distribuido entre 20 e 40 mil, como será o lucor dos segmentos dependendo do custo do ativo?
+
+```{r}
+
+
+dados %>% ggplot(aes(Cost)) +
+  geom_histogram(bins = 50)
+```
+
+Vamos dividir os dados em duas partes, os ativos de `alto custo` e `baixo custo`
+
+
+## Baixo Custo
+
+Os ativos com Custo menor que 40mil
+
+```{r}
+# baixo custo
+kable(
+dados %>% 
+  filter((Cost > 40000) == FALSE) %>% 
+  group_by(Market) %>% 
+  summarise(
+    count_m = n(),
+    avg_profit = median(Profit),
+    avg_debt = median(Debt),
+    avg_cost = median(Cost),
+    positive_profit_rate = round((sum(Profit > 0) / count_m) * 100, 2)
+  ),
+'simple'
+)
+```
+
+Percebe-se que os ativos onde a taxa de lucro (porcentagem de ativos que dão retorno financeiro) é maior que 50%, a média de lucro é positiva, apesar da média de custo ser bem parecida.
+
+## Alto custo
+
+Os ativos com custo maior que 40 mil
+
+```{r}
+kable(
+dados %>% 
+  filter((Cost > 40000) == TRUE) %>% 
+  group_by(Market) %>% 
+  summarise(
+    count_m = n(),
+    avg_profit = mean(Profit),
+    avg_debt = mean(Debt),
+    avg_cost = mean(Cost),
+    positive_profit_rate = sum(Profit > 0) / count_m
+  ),
+'simple'
+)
+```
+
+
+Percebe-se que agora, a maioria dos segmentos de mercado tem uma média de lucro positiva, exceto o Varejo, e isso também se relaciona com a taxa de lucro maior que 50%
+
+Então a opção mais segura é investir nos ativos de baixo custo, dos segmentos de Tecnologia e Varejo.
+
+
+## Como os mercados estão distribuidos entre as Regiões?
+
+Qual é o melhor mercado em cada continente? em taxa de lucro e media de lucro
+
+```{r}
+kable(
+dados %>% 
+  group_by(Market, Location) %>% 
+  summarise(
+    profitable_rate = sum(Profit > 0) / n(),
+    profit_avg = median(Profit)
+  ) %>% 
+  arrange(desc(profitable_rate)),
+'simple'
+)
+
+```
+
+
+Olhando o Top 10, a melhor opção para investir é Energia na Ásia, o melhor segmento para investir é no segmento de Tecnologia, e a melhor região é Oceania. E eu ficaria longe de varejo na américa do sul.
